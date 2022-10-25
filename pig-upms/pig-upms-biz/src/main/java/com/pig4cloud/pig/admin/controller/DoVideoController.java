@@ -17,16 +17,23 @@
 
 package com.pig4cloud.pig.admin.controller;
 
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pig4cloud.pig.admin.api.dto.VideoDTO;
 import com.pig4cloud.pig.admin.api.entity.DoVideo;
+import com.pig4cloud.pig.admin.api.entity.DoVideoDetail;
+import com.pig4cloud.pig.admin.api.vo.VideoDetailVOByJson;
+import com.pig4cloud.pig.admin.api.vo.VideoVOByJson;
 import com.pig4cloud.pig.admin.mapper.DoVideoMapper;
+import com.pig4cloud.pig.admin.service.DoVideoDetailService;
 import com.pig4cloud.pig.admin.service.DoVideoService;
 import com.pig4cloud.pig.common.core.util.R;
 import com.pig4cloud.pig.common.log.annotation.SysLog;
+import com.pig4cloud.pig.common.security.annotation.Inner;
+import com.pig4cloud.pig.common.security.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,7 +43,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -47,87 +56,156 @@ import java.util.ArrayList;
  */
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/dovideo" )
+@RequestMapping("/dovideo")
 @Tag(name = "执法监督（视频分析结果）管理")
 @SecurityRequirement(name = HttpHeaders.AUTHORIZATION)
 public class DoVideoController {
 
-    private final DoVideoService doVideoService;
+	private final DoVideoService doVideoService;
 
-    @Autowired
+	@Autowired
+	private final DoVideoDetailService doVideoDetailService;
+
+	@Autowired
 	private final DoVideoMapper doVideoMapper;
 
-    /**
-     * 分页查询
-     * @param page 分页对象
-     * @param videoDTO 执法监督（视频分析结果）
-     * @return
-     */
-    @Operation(summary = "分页查询", description = "分页查询")
-    @GetMapping("/page" )
-    @PreAuthorize("@pms.hasPermission('video_dovideo_get')" )
-    public R getDoVideoPage(Page page, VideoDTO videoDTO) {
+	/**
+	 * 分页查询
+	 *
+	 * @param page     分页对象
+	 * @param videoDTO 执法监督（视频分析结果）
+	 * @return
+	 */
+	@Operation(summary = "分页查询", description = "分页查询")
+	@GetMapping("/page")
+	@PreAuthorize("@pms.hasPermission('video_dovideo_get')")
+	public R getDoVideoPage(Page page, VideoDTO videoDTO) {
 		System.out.println(videoDTO.getFileName());
 		System.out.println("--------------------");
 		System.out.println(videoDTO.getVdStatus());
 		System.out.println("--------------------");
 		System.out.println(videoDTO.getVdType());
-		if (ObjectUtil.isNull(videoDTO.getVdType())){
+		if (ObjectUtil.isNull(videoDTO.getVdType())) {
 			videoDTO.setVdType(new ArrayList<String>());
 		}
-        return R.ok(doVideoService.getListByFileNameAndVdTypeAndVdStatus(page,videoDTO));
-    }
+		return R.ok(doVideoService.getListByFileNameAndVdTypeAndVdStatus(page, videoDTO));
+	}
 
 
-    /**
-     * 通过id查询执法监督（视频分析结果）
-     * @param vid id
-     * @return R
-     */
-    @Operation(summary = "通过id查询", description = "通过id查询")
-    @GetMapping("/{vid}" )
+	/**
+	 * 通过id查询执法监督（视频分析结果）
+	 *
+	 * @param vid id
+	 * @return R
+	 */
+	@Operation(summary = "通过id查询", description = "通过id查询")
+	@GetMapping("/{vid}")
 //    @PreAuthorize("@pms.hasPermission('video_dovideo_get')" )
-    public R getById(@PathVariable("vid" ) String vid) {
-        return R.ok(doVideoService.getById(vid));
-    }
+	public R getById(@PathVariable("vid") String vid) {
+		return R.ok(doVideoService.getById(vid));
+	}
 
-    /**
-     * 新增执法监督（视频分析结果）
-     * @param doVideo 执法监督（视频分析结果）
-     * @return R
-     */
-    @Operation(summary = "新增执法监督（视频分析结果）", description = "新增执法监督（视频分析结果）")
-    @SysLog("新增执法监督（视频分析结果）" )
-    @PostMapping
-    @PreAuthorize("@pms.hasPermission('video_dovideo_add')" )
-    public R save(@RequestBody DoVideo doVideo) {
-        return R.ok(doVideoService.save(doVideo));
-    }
+	@Operation(summary = "通过fileName查询", description = "通过fileName查询")
+	@GetMapping("/{fileName}")
 
-    /**
-     * 修改执法监督（视频分析结果）
-     * @param doVideo 执法监督（视频分析结果）
-     * @return R
-     */
-    @Operation(summary = "修改执法监督（视频分析结果）", description = "修改执法监督（视频分析结果）")
-    @SysLog("修改执法监督（视频分析结果）" )
-    @PutMapping
-    @PreAuthorize("@pms.hasPermission('video_dovideo_edit')" )
-    public R updateById(@RequestBody DoVideo doVideo) {
-        return R.ok(doVideoService.updateById(doVideo));
-    }
+	public DoVideo getByFileName(@PathVariable("fileName") String fileName) {
+		QueryWrapper wrapper = new QueryWrapper();
+		wrapper.eq("file_name", fileName);
+		return doVideoService.getOne(wrapper);
+	}
 
-    /**
-     * 通过id删除执法监督（视频分析结果）
-     * @param vid id
-     * @return R
-     */
-    @Operation(summary = "通过id删除执法监督（视频分析结果）", description = "通过id删除执法监督（视频分析结果）")
-    @SysLog("通过id删除执法监督（视频分析结果）" )
-    @DeleteMapping("/{vid}" )
-    @PreAuthorize("@pms.hasPermission('video_dovideo_del')" )
-    public R removeById(@PathVariable String vid) {
-        return R.ok(doVideoService.removeById(vid));
-    }
+	/**
+	 * 新增执法监督（视频分析结果）
+	 *
+	 * @param doVideo 执法监督（视频分析结果）
+	 * @return R
+	 */
+	@Operation(summary = "新增执法监督（视频分析结果）", description = "新增执法监督（视频分析结果）")
+	@SysLog("新增执法监督（视频分析结果）")
+	@PostMapping
+	@PreAuthorize("@pms.hasPermission('video_dovideo_add')")
+	public R save(@RequestBody DoVideo doVideo) {
+		return R.ok(doVideoService.save(doVideo));
+	}
 
+	/**
+	 * 修改执法监督（视频分析结果）
+	 *
+	 * @param doVideo 执法监督（视频分析结果）
+	 * @return R
+	 */
+	@Operation(summary = "修改执法监督（视频分析结果）", description = "修改执法监督（视频分析结果）")
+	@SysLog("修改执法监督（视频分析结果）")
+	@PutMapping
+	@PreAuthorize("@pms.hasPermission('video_dovideo_edit')")
+	public R updateById(@RequestBody DoVideo doVideo) {
+		return R.ok(doVideoService.updateById(doVideo));
+	}
+
+	/**
+	 * 通过id删除执法监督（视频分析结果）
+	 *
+	 * @param vid id
+	 * @return R
+	 */
+	@Operation(summary = "通过id删除执法监督（视频分析结果）", description = "通过id删除执法监督（视频分析结果）")
+	@SysLog("通过id删除执法监督（视频分析结果）")
+	@DeleteMapping("/{vid}")
+	@PreAuthorize("@pms.hasPermission('video_dovideo_del')")
+	public R removeById(@PathVariable String vid) {
+		return R.ok(doVideoService.removeById(vid));
+	}
+
+	/**
+	 * 调用别人接口获取json来新增执法监督（视频分析结果）
+	 *
+	 * @param videoVO 执法监督（视频分析结果）
+	 * @return R
+	 */
+
+	@Inner(value = false)
+	@Operation(summary = "调用别人接口获取json来新增执法监督", description = "调用别人接口获取json来新增执法监督")
+	@SysLog("调用别人接口获取json来新增执法监督")
+	@PostMapping("/saveByJson")
+	public R saveByJson(@RequestBody VideoVOByJson videoVO) {
+		System.out.println(videoVO);
+		for (VideoDetailVOByJson o : videoVO.getVideoDetailList()) {
+			System.out.println(o);
+		}
+		System.out.println("fileName=" + videoVO.getFileName()
+				+ ",filePath=" + videoVO.getFilePath()
+				+ ",discriminateStatus=" + videoVO.getDiscriminateStatus()
+				+ ",fileStatus=" + videoVO.getFileStatus()
+				+ ",eventTime=" + videoVO.getEventTime()
+				+ ",analysisStartTime=" + videoVO.getAnalysisStartTime()
+				+ ",analysisEndTime=" + videoVO.getAnalysisEndTime());
+		DoVideo doVideo = new DoVideo();
+		String vid=IdUtil.getSnowflake(1,1).nextIdStr();
+		System.out.println("雪花id"+vid);
+		doVideo.setVid(vid);
+		doVideo.setCreateTime(LocalDateTime.now());
+		doVideo.setFileName(videoVO.getFileName());
+		doVideo.setFilePath(videoVO.getFilePath());
+		doVideo.setEventTime(videoVO.getEventTime());
+		doVideo.setFileStatus(videoVO.getFileStatus());
+		doVideoService.save(doVideo);
+//		DoVideo query = getByFileName(doVideo.getFileName());
+		DoVideo query = (DoVideo) getById(vid).getData();
+		System.out.println(query);
+		if (videoVO.getVideoDetailList().size() > 0) {
+			List<VideoDetailVOByJson> videoDetailVOList = videoVO.getVideoDetailList();
+			for (VideoDetailVOByJson videoDetailVO : videoDetailVOList) {
+				DoVideoDetail videoDetail = new DoVideoDetail();
+				videoDetail.setVdid(IdUtil.getSnowflake(1,1).nextIdStr());
+				videoDetail.setVid(query.getVid());
+				videoDetail.setVdType(videoDetailVO.getVdType());
+				videoDetail.setVdTime1(videoDetailVO.getVdTime1());
+				videoDetail.setVdTime2(videoDetailVO.getVdTime2());
+				videoDetail.setVdPicture(videoDetailVO.getVdPicture());
+				videoDetail.setCreateTime(LocalDateTime.now());
+				doVideoDetailService.save(videoDetail);
+			}
+		}
+		return R.ok("往数据库写入成功");
+	}
 }

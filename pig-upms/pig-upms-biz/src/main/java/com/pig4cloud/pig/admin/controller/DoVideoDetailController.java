@@ -22,11 +22,15 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pig4cloud.pig.admin.api.entity.DoVideo;
 import com.pig4cloud.pig.admin.api.entity.DoVideoDetail;
+import com.pig4cloud.pig.admin.api.vo.VideoDetailVOByJson;
+import com.pig4cloud.pig.admin.api.vo.VideoVOByJson;
 import com.pig4cloud.pig.admin.service.DoVideoDetailService;
 import com.pig4cloud.pig.admin.service.DoVideoService;
 import com.pig4cloud.pig.common.core.util.R;
 import com.pig4cloud.pig.common.log.annotation.SysLog;
 
+import com.pig4cloud.pig.common.security.annotation.Inner;
+import com.pig4cloud.pig.common.security.util.SecurityUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -34,6 +38,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 
 
 /**
@@ -125,6 +131,8 @@ public class DoVideoDetailController {
 			DoVideoDetail videoDetail = doVideoDetailService.getById(doVideoDetail.getVdid());
 			DoVideo doVideo = doVideoService.getById(videoDetail.getVid());
 			doVideo.setFileStatus(1);
+			doVideoDetail.setConfirmTime(LocalDateTime.now());
+			doVideoDetail.setConfirmUser(SecurityUtils.getUser().getName());
 			doVideoService.updateById(doVideo);
 		}
         return R.ok(doVideoDetailService.updateById(doVideoDetail));
@@ -143,4 +151,13 @@ public class DoVideoDetailController {
         return R.ok(doVideoDetailService.removeById(vdid));
     }
 
+	@Inner(value = false)
+	@Operation(summary = "调用别人接口获取json来新增执法监督明细", description = "调用别人接口获取json来新增执法监督明细")
+	@SysLog("调用别人接口获取json来新增执法监督明细")
+	@PostMapping("/saveByJson")
+	public String saveByJson(@RequestBody VideoDetailVOByJson videoDetailVO) {
+		System.out.println(videoDetailVO);
+//		return R.ok();
+		return "访问了";
+	}
 }
