@@ -20,24 +20,22 @@ package com.pig4cloud.pig.admin.controller;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pig4cloud.pig.admin.api.dto.VideoDTO;
 import com.pig4cloud.pig.admin.api.entity.DoVideo;
 import com.pig4cloud.pig.admin.api.entity.DoVideoDetail;
 import com.pig4cloud.pig.admin.api.vo.VideoDetailVOByJson;
 import com.pig4cloud.pig.admin.api.vo.VideoVOByJson;
-import com.pig4cloud.pig.admin.mapper.DoVideoMapper;
 import com.pig4cloud.pig.admin.service.DoVideoDetailService;
 import com.pig4cloud.pig.admin.service.DoVideoService;
 import com.pig4cloud.pig.common.core.util.R;
 import com.pig4cloud.pig.common.log.annotation.SysLog;
 import com.pig4cloud.pig.common.security.annotation.Inner;
-import com.pig4cloud.pig.common.security.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -66,8 +64,6 @@ public class DoVideoController {
 	@Autowired
 	private final DoVideoDetailService doVideoDetailService;
 
-	@Autowired
-	private final DoVideoMapper doVideoMapper;
 
 	/**
 	 * 分页查询
@@ -86,7 +82,7 @@ public class DoVideoController {
 		System.out.println("--------------------");
 		System.out.println(videoDTO.getVdType());
 		if (ObjectUtil.isNull(videoDTO.getVdType())) {
-			videoDTO.setVdType(new ArrayList<String>());
+			videoDTO.setVdType(new ArrayList<>());
 		}
 		return R.ok(doVideoService.getListByFileNameAndVdTypeAndVdStatus(page, videoDTO));
 	}
@@ -98,7 +94,8 @@ public class DoVideoController {
 	 * @param vid id
 	 * @return R
 	 */
-	@Operation(summary = "通过id查询", description = "通过id查询")
+	@Operation(summary = "通过vid查询", description = "通过vid查询")
+	@SysLog("通过vid查询")
 	@GetMapping("/{vid}")
 //    @PreAuthorize("@pms.hasPermission('video_dovideo_get')" )
 	public R getById(@PathVariable("vid") String vid) {
@@ -106,8 +103,8 @@ public class DoVideoController {
 	}
 
 	@Operation(summary = "通过fileName查询", description = "通过fileName查询")
+	@SysLog("通过fileName查询")
 	@GetMapping("/{fileName}")
-
 	public DoVideo getByFileName(@PathVariable("fileName") String fileName) {
 		QueryWrapper wrapper = new QueryWrapper();
 		wrapper.eq("file_name", fileName);
@@ -164,8 +161,8 @@ public class DoVideoController {
 	 */
 
 	@Inner(value = false)
-	@Operation(summary = "调用别人接口获取json来新增执法监督", description = "调用别人接口获取json来新增执法监督")
-	@SysLog("调用别人接口获取json来新增执法监督")
+	@Operation(summary = "传递json来调用接口新增执法监督和明细", description = "传递json来调用接口新增执法监督和明细")
+	@SysLog("传递json来调用接口新增执法监督和明细")
 	@PostMapping("/saveByJson")
 	public R saveByJson(@RequestBody VideoVOByJson videoVO) {
 		System.out.println(videoVO);
@@ -179,30 +176,37 @@ public class DoVideoController {
 				+ ",eventTime=" + videoVO.getEventTime()
 				+ ",analysisStartTime=" + videoVO.getAnalysisStartTime()
 				+ ",analysisEndTime=" + videoVO.getAnalysisEndTime());
+		//先添加主表信息
 		DoVideo doVideo = new DoVideo();
-		String vid=IdUtil.getSnowflake(1,1).nextIdStr();
-		System.out.println("雪花id"+vid);
+		//生成雪花id
+		String vid = IdUtil.getSnowflake(1, 1).nextIdStr();
+		System.out.println("雪花id" + vid);
 		doVideo.setVid(vid);
 		doVideo.setCreateTime(LocalDateTime.now());
-		doVideo.setFileName(videoVO.getFileName());
-		doVideo.setFilePath(videoVO.getFilePath());
-		doVideo.setEventTime(videoVO.getEventTime());
-		doVideo.setFileStatus(videoVO.getFileStatus());
+		BeanUtils.copyProperties(videoVO, doVideo);
+//		doVideo.setFileName(videoVO.getFileName());
+//		doVideo.setFilePath(videoVO.getFilePath());
+//		doVideo.setEventTime(videoVO.getEventTime());
+//		doVideo.setFileStatus(videoVO.getFileStatus());
+		System.out.println(doVideo);
 		doVideoService.save(doVideo);
-//		DoVideo query = getByFileName(doVideo.getFileName());
+		//获取到之前插入的主表信息，因为插入附表需要主表的vid
 		DoVideo query = (DoVideo) getById(vid).getData();
 		System.out.println(query);
 		if (videoVO.getVideoDetailList().size() > 0) {
+			//取出附表信息，遍历插入
 			List<VideoDetailVOByJson> videoDetailVOList = videoVO.getVideoDetailList();
 			for (VideoDetailVOByJson videoDetailVO : videoDetailVOList) {
 				DoVideoDetail videoDetail = new DoVideoDetail();
-				videoDetail.setVdid(IdUtil.getSnowflake(1,1).nextIdStr());
+				videoDetail.setVdid(IdUtil.getSnowflake(1, 1).nextIdStr());
 				videoDetail.setVid(query.getVid());
-				videoDetail.setVdType(videoDetailVO.getVdType());
-				videoDetail.setVdTime1(videoDetailVO.getVdTime1());
-				videoDetail.setVdTime2(videoDetailVO.getVdTime2());
-				videoDetail.setVdPicture(videoDetailVO.getVdPicture());
+				BeanUtils.copyProperties(videoDetailVO, videoDetail);
+//				videoDetail.setVdType(videoDetailVO.getVdType());
+//				videoDetail.setVdTime1(videoDetailVO.getVdTime1());
+//				videoDetail.setVdTime2(videoDetailVO.getVdTime2());
+//				videoDetail.setVdPicture(videoDetailVO.getVdPicture());
 				videoDetail.setCreateTime(LocalDateTime.now());
+				System.out.println(videoDetail);
 				doVideoDetailService.save(videoDetail);
 			}
 		}

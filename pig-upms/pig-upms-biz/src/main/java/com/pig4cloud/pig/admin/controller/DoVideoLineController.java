@@ -20,19 +20,14 @@ package com.pig4cloud.pig.admin.controller;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.pig4cloud.pig.admin.api.entity.DoVideo;
-import com.pig4cloud.pig.admin.api.entity.DoVideoDetail;
 import com.pig4cloud.pig.admin.api.entity.DoVideoLine;
-import com.pig4cloud.pig.admin.api.vo.VideoDetailVOByJson;
 import com.pig4cloud.pig.admin.api.vo.VideoLineVOByJson;
-import com.pig4cloud.pig.admin.api.vo.VideoVOByJson;
 import com.pig4cloud.pig.admin.service.DoVideoLineService;
 import com.pig4cloud.pig.common.core.util.R;
 import com.pig4cloud.pig.common.log.annotation.SysLog;
-
 import com.pig4cloud.pig.common.security.annotation.Inner;
+import org.springframework.beans.BeanUtils;
 import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -83,7 +78,7 @@ public class DoVideoLineController {
 		if (!doVideoLine.getVlUser().equals("")) {
 			wrapper.like("vl_user", doVideoLine.getVlUser());
 		}
-		wrapper.orderByDesc("create_time");
+		wrapper.orderByDesc("update_time");
 		return R.ok(doVideoLineService.page(page, wrapper));
 	}
 
@@ -206,11 +201,12 @@ public class DoVideoLineController {
 //	}
 
 	@Inner(value = false)
-	@Operation(summary = "调用别人接口获取json来新增设备管理", description = "调用别人接口获取json来新增设备管理")
-	@SysLog("调用别人接口获取json来新增设备管理")
-	@PostMapping("/saveByJson")
+	@Operation(summary = "传递json调用接口来新增或更新设备管理", description = "传递json调用接口来新增或更新设备管理")
+	@SysLog("传递json调用接口来新增或更新设备管理")
+	@PostMapping("/saveOrUpdateByJson")
 	public R saveByJson(@RequestBody List<VideoLineVOByJson> videoLineVOList) {
 		System.out.println(videoLineVOList);
+		//遍历插入数据
 		for (VideoLineVOByJson o : videoLineVOList) {
 			System.out.println(o);
 			System.out.println("updateTime=" + o.getUpdateTime()
@@ -218,55 +214,26 @@ public class DoVideoLineController {
 					+ ",vlName=" + o.getVlName()
 					+ ",vlUser=" + o.getVlUser()
 					+ ",vlRtsp=" + o.getVlRtsp());
+			//插入前先根据name和key来判断是更新还是新增
 			QueryWrapper wrapper = new QueryWrapper();
 			wrapper.eq("vl_key", o.getVlKey());
 			wrapper.eq("vl_name", o.getVlName());
-
 			DoVideoLine videoLine = doVideoLineService.getOne(wrapper);
+			//如果有就直接更新原来的数据
 			if (ObjectUtil.isNotEmpty(videoLine)) {
 				videoLine.setUpdateTime(o.getUpdateTime());
 				videoLine.setVlUser(o.getVlUser());
 				videoLine.setVlRtsp(o.getVlRtsp());
 				doVideoLineService.updateById(videoLine);
 			} else {
+				//如果没有就是新增
 				DoVideoLine line = new DoVideoLine();
 				line.setVlid(IdUtil.getSnowflake(1, 1).nextIdStr());
 				line.setCreateTime(LocalDateTime.now());
-				line.setUpdateTime(o.getUpdateTime());
-				line.setVlUser(o.getVlUser());
-				line.setVlKey(o.getVlKey());
-				line.setVlName(o.getVlName());
-				line.setVlRtsp(o.getVlRtsp());
+				BeanUtils.copyProperties(o, line);
 				doVideoLineService.save(line);
 			}
 		}
 		return R.ok("设备更新成功");
-//		DoVideo doVideo = new DoVideo();
-//		String vid= IdUtil.getSnowflake(1,1).nextIdStr();
-//		doVideo.setVid(vid);
-//		doVideo.setCreateTime(LocalDateTime.now());
-//		doVideo.setFileName(videoVO.getFileName());
-//		doVideo.setFilePath(videoVO.getFilePath());
-//		doVideo.setEventTime(videoVO.getEventTime());
-//		doVideo.setFileStatus(videoVO.getFileStatus());
-//		doVideoService.save(doVideo);
-////		DoVideo query = getByFileName(doVideo.getFileName());
-//		DoVideo query = (DoVideo) getById(vid).getData();
-//		System.out.println(query);
-//		if (videoVO.getVideoDetailList().size() > 0) {
-//			List<VideoDetailVOByJson> videoDetailVOList = videoVO.getVideoDetailList();
-//			for (VideoDetailVOByJson videoDetailVO : videoDetailVOList) {
-//				DoVideoDetail videoDetail = new DoVideoDetail();
-//				videoDetail.setVdid(IdUtil.getSnowflake(1,1).nextIdStr());
-//				videoDetail.setVid(query.getVid());
-//				videoDetail.setVdType(videoDetailVO.getVdType());
-//				videoDetail.setVdTime1(videoDetailVO.getVdTime1());
-//				videoDetail.setVdTime2(videoDetailVO.getVdTime2());
-//				videoDetail.setVdPicture(videoDetailVO.getVdPicture());
-//				videoDetail.setCreateTime(LocalDateTime.now());
-//				doVideoDetailService.save(videoDetail);
-//			}
-//		}
-
 	}
 }
